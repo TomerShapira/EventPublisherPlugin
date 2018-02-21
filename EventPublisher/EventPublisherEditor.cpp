@@ -43,14 +43,14 @@ EventPublisherEditor::EventPublisherEditor(GenericProcessor* parentNode, bool us
 
 	// event types
     eventsLabel = new Label("Events", "Events");
-    eventsLabel->setBounds(10,80,140,25);
+    eventsLabel->setBounds(10,75,50,25);
     eventsLabel->setFont(Font("Small Text", 12, Font::plain));
     eventsLabel->setColour(Label::textColourId, Colours::darkgrey);
     addAndMakeVisible(eventsLabel);
 
     ttlButton = new UtilityButton("TTL", Font("Default", 10, Font::plain));
     ttlButton->addListener(this);
-    ttlButton->setBounds(15, 105, 40, 18);
+    ttlButton->setBounds(70, 80, 40, 18);
     ttlButton->setClickingTogglesState(true);
     ttlButton->setToggleState(p->getPublishTtl(), dontSendNotification);
     ttlButton->setTooltip("Send TTL events");
@@ -58,11 +58,26 @@ EventPublisherEditor::EventPublisherEditor(GenericProcessor* parentNode, bool us
 
     textButton = new UtilityButton("Text", Font("Default", 10, Font::plain));
     textButton->addListener(this);
-    textButton->setBounds(60, 105, 40, 18);
+    textButton->setBounds(120, 80, 40, 18);
     textButton->setClickingTogglesState(true);
     textButton->setToggleState(p->getPublishText(), dontSendNotification);
     textButton->setTooltip("Send text events");
     addAndMakeVisible(textButton);
+
+	// TTL channels
+   	for (int i=0; i<8; i++)
+    {
+        UtilityButton* button = new UtilityButton(String(i+1), Font("Default", 10, Font::plain));
+		button->setBounds(10+i*19, 105, 17, 18);
+        button->addListener(this);
+        button->setToggleState(p->getTtlChannelStatus(i), dontSendNotification);
+        button->setClickingTogglesState(true);
+		//button->setTooltip("Send TTL events for channel " + String(i+1));
+		addAndMakeVisible(button);
+
+        channelButtons.add(button);
+	}
+
 
     setEnabledState(false);
 }
@@ -75,37 +90,50 @@ void EventPublisherEditor::updateSettings()
 	portLabel->setText(String(p->getListeningPort()), dontSendNotification);
 	ttlButton->setToggleState(p->getPublishTtl(), dontSendNotification);
 	textButton->setToggleState(p->getPublishText(), dontSendNotification);
+
+	for (int i=0; i<channelButtons.size(); i++)
+	{
+		channelButtons[i]->setToggleState(p->getTtlChannelStatus(i), dontSendNotification);
+	}
 }
 
 
 void EventPublisherEditor::buttonEvent(Button* button)
 {
+	EventPublisher* p = (EventPublisher*)getProcessor();
+
     if (button == restartConnection)
     {
-        EventPublisher* p = (EventPublisher*)getProcessor();
         p->setListeningPort(p->getListeningPort(), true);
     }
 	else if (button == ttlButton)
 	{
-		EventPublisher* p = (EventPublisher*)getProcessor();
 		p->setPublishTtl(button->getToggleState());
 	}
 	else if (button == textButton)
 	{
-		EventPublisher* p = (EventPublisher*)getProcessor();
 		p->setPublishText(button->getToggleState());
+	}
+	else
+	{
+		for (int i=0; i<channelButtons.size(); i++)
+		{
+			if (button == channelButtons[i])
+			{
+				p->setTtlChannelStatus(i, button->getToggleState());
+			}
+		}
 	}
 }
 
 
 void EventPublisherEditor::labelTextChanged(juce::Label* label)
 {
+	EventPublisher* p = (EventPublisher*)getProcessor();
+
     if (label == portLabel)
     {
-        Value val = label->getTextValue();
-
-        EventPublisher* p = (EventPublisher*)getProcessor();
-        p->setListeningPort(val.getValue());
+        p->setListeningPort(label->getTextValue().getValue());
     }
 }
 

@@ -46,6 +46,11 @@ EventPublisher::EventPublisher()
     setProcessorType (PROCESSOR_TYPE_SINK);
 
     setListeningPort(5557);
+
+	for (int i=0; i<8; i++)
+	{
+		ttlChannelStatus.add(true);
+	}
 }
 
 
@@ -87,6 +92,27 @@ void EventPublisher::setListeningPort(int port, bool forceRestart)
 }
 
 
+void EventPublisher::setTtlChannelStatus(int channel, bool enabled)
+{
+	if (channel >= 0 && channel < 8)
+	{
+		ttlChannelStatus.set(channel, enabled);
+	}
+}
+
+
+bool EventPublisher::getTtlChannelStatus(int channel)
+{
+	bool status = false;
+	if (channel >= 0 && channel < 8)
+	{
+		status = ttlChannelStatus[channel];
+	}
+
+	return status;
+}
+
+
 void EventPublisher::process(AudioSampleBuffer& continuousBuffer)
 {
     checkForEvents(true);
@@ -100,6 +126,7 @@ void EventPublisher::updateSettings()
 		editor->updateSettings();
 	}
 }
+
 
 
 void EventPublisher::sendEvent(const MidiMessage& event, const EventChannel* eventInfo) const
@@ -116,21 +143,24 @@ void EventPublisher::sendEvent(const MidiMessage& event, const EventChannel* eve
         const int eventId = ttl->getState() ? 1 : 0;
         const int eventChannel = ttl->getChannel();
 
-		// not particularly efficient but should work on different platforms
-		// without any complicated parsing.
-		// format: TTL time ttl_channel state
-		// note that ttl_channel is 1-based
- 		std::ostringstream s;
-  		s << "TTL " << std::setprecision(12) << timestampSeconds;
-		s << " " << eventChannel+1;
-		s << " " << eventId;
-		String msg = String(s.str());
-
-		if(zmq_send(zmqSocket.get(), msg.getCharPointer(), msg.length(), ZMQ_DONTWAIT) == -1)
+		if (ttlChannelStatus[eventChannel])
 		{
-			std::cout << "Could not publish TTL message: " << msg.toRawUTF8() << "\n";
+			// not particularly efficient but should work on different platforms
+			// without any complicated parsing.
+			// format: TTL time ttl_channel state
+			// note that ttl_channel is 1-based to make it consistent what is
+			// shown in the GUI
+	 		std::ostringstream s;
+	  		s << "TTL " << std::setprecision(12) << timestampSeconds;
+			s << " " << eventChannel+1;
+			s << " " << eventId;
+			String msg = String(s.str());
+
+			if(zmq_send(zmqSocket.get(), msg.getCharPointer(), msg.length(), ZMQ_DONTWAIT) == -1)
+			{
+				std::cout << "Could not publish TTL message: " << msg.toRawUTF8() << "\n";
+			}
 		}
-		
 	}
 	else if ((Event::getEventType(event) == EventChannel::TEXT) && publishText)
 	{
@@ -164,9 +194,18 @@ void EventPublisher::handleSpike(const SpikeChannel* channelInfo, const MidiMess
 void EventPublisher::saveCustomParametersToXml(XmlElement* parentElement)
 {
     XmlElement* mainNode = parentElement->createNewChildElement("EventPublisher");
-    mainNode->setAttribute("port", listeningPort);
-	mainNode->setAttribute("publishTtl", publishTtl);
-	mainNode->setAttribute("publishText", publishText);
+    mainNode->setAttribute("Port", listeningPort);
+	mainNode->setAttribute("PublishTTL", publishTtl);
+	mainNode->setAttribute("PublishText", publishText);
+
+	String s = "";
+	for (int i=0; i<ttlChannelStatus.size(); i++)
+	{
+		if (i > 0)
+			s += ",";
+		s += String(ttlChannelStatus[i]);
+	}
+	mainNode->setAttribute("TTLChannelStatus", s);
 }
 
 
@@ -174,17 +213,26 @@ void EventPublisher::loadCustomParametersFromXml()
 {
     if (parametersAsXml)
     {
-        forEachXmlChildElement(*parametersAsXml, mainNode)
+        forEachXmlChildElement(*parametersAsXml, node)
         {
-            if (mainNode->hasTagName("EventPublisher"))
+            if (node->hasTagName("EventPublisher"))
             {
-                setListeningPort(mainNode->getIntAttribute("port"));
-				setPublishTtl(mainNode->getBoolAttribute("publishTtl"));
-				setPublishText(mainNode->getBoolAttribute("publishText"));
+                setListeningPort(node->getIntAttribute("Port"));
+				setPublishTtl(node->getBoolAttribute("PublishTTL"));
+				setPublishText(node->getBoolAttribute("PublishText"));
+
+				String s = node->getStringAttribute("TTLChannelStatus");
+
+				StringArray tokens;
+				tokens.addTokens(s, ",", "\"");
+				for (int i=0; i<tokens.size(); i++)
+				{
+				    setTtlChannelStatus(i, tokens[i].getIntValue() > 0); // holds next token
+				}
+
+				updateSettings();
             }
         }
-
-		updateSettings();
     }
 }
 

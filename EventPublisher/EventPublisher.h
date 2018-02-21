@@ -49,6 +49,9 @@ public:
 	void setPublishText(bool status) { publishText = status; }
 	bool getPublishText() { return publishText; }
 
+	void setTtlChannelStatus(int channel, bool enabled);
+	bool getTtlChannelStatus(int channel);
+
 private:
 	void sendEvent(const MidiMessage& event, const EventChannel* eventInfo) const;
     static std::shared_ptr<void> getZMQContext();
@@ -60,6 +63,7 @@ private:
 
 	bool publishTtl;
 	bool publishText;
+	Array<bool> ttlChannelStatus;
 };
 
 

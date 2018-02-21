@@ -40,6 +40,8 @@ private:
     ScopedPointer<UtilityButton> ttlButton;
     ScopedPointer<UtilityButton> textButton;
 
+	OwnedArray<UtilityButton> channelButtons;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EventPublisherEditor);
 };
 
